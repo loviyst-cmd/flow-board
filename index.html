@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Flow Board — 极简看板</title>
 <style>
 :root{
@@ -214,12 +214,79 @@ body{background:var(--bg-gradient);color:var(--text-1);user-select:none;-webkit-
 .side-action.danger:hover{background:var(--danger-light);color:var(--danger)}
 .date-input{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-family:inherit;font-size:12px;color:var(--text-1);outline:none}
 .date-input:focus{border-color:var(--accent)}
-@media (max-width:768px){.sidebar{width:60px}.sidebar-header,.sidebar-section-label,.project-name,.add-project span,.recycle-btn span,.recycle-count,.sidebar-tab,.sidebar-tabs{display:none}.main{margin-left:60px}.modal-body{grid-template-columns:1fr}.modal-side{order:-1}}
+@keyframes slideInLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+/* ===== 移动端适配 ===== */
+@media (max-width:768px){
+  /* 侧边栏改抽屉式 */
+  .sidebar{
+    width:280px;
+    transform:translateX(-100%);
+    transition:transform 0.3s cubic-bezier(0.2,0.8,0.2,1);
+    box-shadow:4px 0 24px rgba(30,58,95,0.15);
+  }
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-backdrop{
+    position:fixed;inset:0;background:rgba(15,23,42,0.4);
+    z-index:49;opacity:0;pointer-events:none;
+    transition:opacity 0.3s;
+  }
+  .sidebar-backdrop.open{opacity:1;pointer-events:auto}
+  /* 侧边栏内部恢复完整显示（覆盖 60px 窄栏样式） */
+  .sidebar-header,.sidebar-section-label,.project-name,.add-project span,.recycle-btn span,.recycle-count,.sidebar-tab,.sidebar-tabs{display:revert}
+  .main{margin-left:0}
+  /* 顶栏：加汉堡菜单按钮 */
+  .menu-toggle{
+    display:flex !important;
+    align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:8px;
+    border:none;background:transparent;cursor:pointer;
+    color:var(--text-2);font-size:20px;margin-right:8px;
+  }
+  .menu-toggle:active{background:var(--border-light)}
+  .topbar{padding:10px 12px}
+  .topbar-title{font-size:16px}
+  .topbar-sub{font-size:11px}
+  .topbar-actions .btn{padding:6px 10px;font-size:12px}
+  /* 看板区：列表固定宽度，横向滑动 */
+  .board-scroll{padding:12px}
+  .list{flex:0 0 85vw;max-width:320px;min-width:260px}
+  /* 卡片：增大触摸区域 */
+  .card{padding:10px 12px}
+  .card-title{font-size:14px}
+  /* 弹窗：全屏化 */
+  .modal{
+    width:100vw !important;max-height:100vh !important;
+    height:100dvh;border-radius:0;
+    bottom:0 !important;top:0 !important;left:0 !important;
+  }
+  .modal-body{grid-template-columns:1fr !important;padding:12px !important}
+  .modal-side{order:-1 !important}
+  .modal-header{padding:12px 14px 10px !important}
+  .modal-title-input{font-size:17px !important}
+  /* 添加卡片弹窗也全屏 */
+  #add-card-modal{
+    width:100vw !important;max-height:100vh !important;
+    height:100dvh;border-radius:0;
+  }
+  /* 卡片标签/按钮增大触摸区 */
+  .subtask-check{width:22px;height:22px}
+  .subtask-del{opacity:0.5;width:28px;height:28px}
+  .label-color-opt{width:32px;height:32px}
+  .btn-icon{width:32px;height:32px}
+}
+/* PC 端隐藏汉堡按钮 */
+.menu-toggle{display:none}
+/* 拖拽元素阻止默认触摸手势（滚动/长按菜单） */
+.card,.list-header{touch-action:none}
+/* 卡片内的输入框等允许正常触摸 */
+.card input,.card textarea,.subtask-check,.subtask-del,.label-remove,.label-color-opt{touch-action:auto}
 </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+<div class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-brand">
       <div class="brand-logo">F</div>
@@ -243,6 +310,7 @@ body{background:var(--bg-gradient);color:var(--text-1);user-select:none;-webkit-
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
+      <button class="menu-toggle" onclick="openSidebar()" aria-label="菜单">☰</button>
       <div>
         <div class="topbar-title" id="topbar-title">看板</div>
         <div class="topbar-sub" id="topbar-sub"></div>
@@ -441,7 +509,10 @@ function renderSidebar(){
 }
 
 function setProjectFilter(f){state.projectFilter=f;renderSidebar()}
-function switchProject(id){state.currentProjectId=id;state.view='board';renderAll()}
+function switchProject(id){state.currentProjectId=id;state.view='board';renderAll();closeSidebar()}
+/* 移动端侧边栏抽屉控制 */
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-backdrop').classList.add('open')}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-backdrop').classList.remove('open')}
 function addProject(){
   const name=prompt('输入项目名称：');
   if(!name||!name.trim())return;
@@ -738,7 +809,9 @@ function emptyRecycleBin(){
 }
 
 /* 拖拽 */
-let drag=null;const DRAG_THRESHOLD=5;let lastPointerX=0,lastPointerY=0;
+let drag=null;
+const DRAG_THRESHOLD=8;  // 增大阈值，避免移动端误触
+let lastPointerX=0,lastPointerY=0;
 function initDrag(){
   document.addEventListener('pointerdown',onPointerDown,{passive:false});
   document.addEventListener('pointermove',onPointerMove,{passive:false});
@@ -988,7 +1061,7 @@ function exportData(){const blob=new Blob([exportState()],{type:'application/jso
 function importData(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{importState(reader.result)};reader.readAsText(file);e.target.value=''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.getElementById('modal').classList.contains('active'))closeModal();if(document.getElementById('add-card-modal').classList.contains('active'))closeAddCardModal()}});
 // 暴露到 window 供调试
-Object.assign(window,{renderAll,openCardModal,closeModal,moveCurrentCardToRecycle,toggleRecycleView,switchProject,toggleArchiveProject,addSubtask,toggleSubtask,openAddCardModal,closeAddCardModal,confirmAddCard,renderAddCardLabelsEditor,renderAddCardLabelPalette,renderAddCardSubtasks,addAddCardSubtask,getCurrentState:()=>state,saveState,loadState,exportState,importState,clearAllData});
+Object.assign(window,{renderAll,openCardModal,closeModal,moveCurrentCardToRecycle,toggleRecycleView,switchProject,toggleArchiveProject,addSubtask,toggleSubtask,openAddCardModal,closeAddCardModal,confirmAddCard,renderAddCardLabelsEditor,renderAddCardLabelPalette,renderAddCardSubtasks,addAddCardSubtask,getCurrentState:()=>state,saveState,loadState,exportState,importState,clearAllData,openSidebar,closeSidebar});
 renderAll();initDrag();
 </script>
 </body>
